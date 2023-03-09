@@ -1,3 +1,5 @@
+import base64
+
 import flask
 from flask import request, jsonify
 from flask_cors import CORS, cross_origin
@@ -18,6 +20,7 @@ from tensorflow.keras import optimizers, losses
 from pathlib import Path
 import os.path
 import itertools
+from io import BytesIO
 import requests
 
 # Make an api that uses the vgg_model.h5 file to predict the class of an image (child or adult)
@@ -28,6 +31,7 @@ app = flask.Flask(__name__)
 app.config["DEBUG"] = True
 CORS(app)
 
+
 # Load model
 model = keras.models.load_model('vgg_model.h5')
 
@@ -37,7 +41,6 @@ model = keras.models.load_model('vgg_model.h5')
 def home():
   return '''<h1>API</h1>
 <p>A prototype API for predicting the class of an image.</p>'''
-
 
 # A route to return the class of an image
 @app.route('/api/v1/resources/images', methods=['GET'])
@@ -73,6 +76,36 @@ def api_id():
   else:
     return jsonify({'class': 'child'})
 
+# Prediction API route using image base64
+@app.route('/predict_base64', methods=['POST'])
+def predict():
+    # Get image from url post
+    input_json = request.get_json(force=True)
+    res = {'image': input_json['image']}
+
+    # prepare res['image'] to be converted to BytesIO
+    res['image'] = res['image'].split(',')[1]
+    res['image'] = base64.b64decode(res['image'])
+
+    # Convert res['image'] to BytesIO
+    imgmodel = BytesIO(res['image'])
+
+    # Load image
+    img = image.load_img(imgmodel, target_size=(150, 150))
+    img = image.img_to_array(img)
+    img = np.expand_dims(img, axis=0)
+    img = img / 255
+
+    # Predict class
+    pred = model.predict(img)
+    pred = np.argmax(pred, axis=1)
+    pred = pred.tolist()
+
+    # Return class knowing if 0 is adult and 1 is child as array class: adult or class: child
+    if pred[0] == 0:
+        return jsonify({'class': 'adult'})
+    else:
+        return jsonify({'class': 'child'})
 
 app.run()
 
