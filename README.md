@@ -1,4 +1,4 @@
-# CHAD Detector
+# ChAd Detector (for child-adult detector)
 ## An Image Classification API using VGG16 Model
 This project is a prototype API that predicts the class of an image as either 'adult' or 'child' using a pre-trained VGG16 convolutional neural network model. The model was trained on a dataset of images containing adults and children using transfer learning.
 
