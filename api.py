@@ -1,8 +1,10 @@
 import base64
 
+import re
 import flask
-from flask import request, jsonify
+from flask import request, jsonify, send_file
 from flask_cors import CORS, cross_origin
+from PIL import Image
 import json
 import os
 import numpy as np
@@ -22,6 +24,12 @@ import os.path
 import itertools
 from io import BytesIO
 import requests
+import keras_ocr
+
+# keras-ocr will automatically download pretrained
+# weights for the detector and recognizer.
+pipeline = keras_ocr.pipeline.Pipeline()
+
 
 # Make an api that uses the vgg_model.h5 file to predict the class of an image (child or adult)
 # The api should take in an url of an image and return the class of the image
@@ -35,6 +43,9 @@ CORS(app)
 # Load model
 model = keras.models.load_model('vgg_model.h5')
 
+@app.route('/image')
+def get_image():
+    return send_file('fichier.jpeg', mimetype='image/jpeg')
 
 # Define api
 @app.route('/api', methods=['GET'])
@@ -106,6 +117,48 @@ def predict():
         return jsonify({'class': 'adult'})
     else:
         return jsonify({'class': 'child'})
+
+@app.route('/predict_base64_ocr', methods=['POST'])
+def predict_ocr():
+
+    # get image from url post
+    input_json = request.get_json(force=True)
+    res = {'image': input_json['image']}
+
+    img = res["image"]
+    base64_string = img.replace("data:image/jpeg;base64,", "")
+    img_data = base64.b64decode(base64_string)
+
+    img = Image.open(BytesIO(img_data))
+
+    img = img.resize((1920, 1920))
+
+    # Enregistrer l'image en tant que fichier jpeg nommé "fichier.jpeg"
+    img.save("fichier.jpeg", "JPEG")
+
+    images = [
+        keras_ocr.tools.read(url) for url in [
+            'http://localhost:5000/image'
+        ]
+    ]
+
+    prediction_groups = pipeline.recognize(images)
+
+    predicted_image_1 = prediction_groups[0]
+
+    textList = ""
+    for text, box in predicted_image_1:
+        textList += text + " "
+
+    # make a regex for find 4digits continue
+    regex_year = r"\b(\d{4})\b"
+
+    resultats = re.findall(regex_year, textList)
+
+    date = resultats[0]
+
+    return jsonify({'date': date})
+
 
 app.run()
 
